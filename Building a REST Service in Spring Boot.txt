@@ -1,0 +1,139 @@
+waarom spring boot ipv spring
+Spring Boot bied een manier aan om snel production-ready applicaties op te zetten. Je kan snel een stand-alone applicatie 
+opzetten door het gebruik van een embedded Tomcat of Jetty. Met hun "opionated view" op de configuratie van Spring en 
+third-party libraries moet de developer enkel de configuratie doen die specifiek is voor zijn applicatie. 
+
+wat is het voordeel voor de developer
+Spring Boot supporteert out-of-the-box metrics, health-checks en externe configuratie. Via start.spring.io kan een developer
+makkelijk een nieuw project opstarten met de gewenste dependencies. Hiervoor is geen of minimale configuratie vereist. 
+Door de embedded Tomcat kan de applicatie makkelijk gedraaid en gedebugged worden op de lokale machine. 
+
+start.spring.io
+New project with
+- Web
+- MongoDB
+- Embedded MongoDB
+- Actuator
+- Actuator Docs
+
+Open project in IntelliJ
+
+Go to build.gradle
+change flapdoodle dependency to compile 
+
+Terminal: gradle clean bootRun
+
+Toon localhost:8080/actuator
+Toon localhost:8080/metrics -> beveiligd
+
+properties toevoegen, restart
+security.basic.enabled=false
+management.security.enabled=false
+
+Toon localhost:8080/metrics
+
+Add Class Robot
+@Id public String id;
+public String name;
+public int height;
+public boolean lethal;
+add empty constructor + constructor without id
+
+Add Interface RobotRepository
+public interface RobotRepository extends MongoRepository<Robot, String>
+
+Go to DemoApplication
+add @Autowired public RobotRepository robotRepository;
+
+Setup database in same class
+@Bean
+InitializingBean setupDatabase() {
+    return () -> {
+        robotRepository.save(new Robot("BB-8", 67, false));
+        robotRepository.save(new Robot("K-2SO", 216, true));
+        robotRepository.save(new Robot("R2-D2", 109, true));
+        robotRepository.save(new Robot("C-3PO", 167, false));
+    };
+}
+
+Add Class RobotController
+@RestController
+@RequestMapping("/robots")
+public class RobotController {
+    @Autowired
+    private RobotRepository robotRepository;
+
+    @RequestMapping
+    public List<Robot> findAll() {
+        return robotRepository.findAll();
+    }
+}
+
+Terminal: gradle clean bootRun
+
+Surf to http://localhost:8080/robots
+
+Add Class RobotNotFoundException
+@ResponseStatus(HttpStatus.NOT_FOUND)
+public class RobotNotFoundException extends RuntimeException {
+    public RobotNotFoundException(String identifier) {
+        super("Could not find robot " + identifier + ".");
+    }
+}
+
+Go to RobotController
+Add findOne()
+@RequestMapping("/{id}")
+public Robot findOne(@PathVariable String id) {
+    Robot robot = robotRepository.findOne(id);
+    if(robot != null) 
+        return robot;
+    throw new RobotNotFoundException(id);
+}
+
+Add create()
+@RequestMapping(method = RequestMethod.POST)
+public Robot create(Robot robot) {
+    return robotRepository.insert(robot);
+}
+
+Go to POSTMAN
+Proof it works!
+{
+	"name": "B1 Battle Droid",
+	"height": 193,
+	"lethal": true
+}
+{
+	"name": "T-101 Terminator",
+	"height": 188,
+	"lethal": true
+}
+{
+	"name": "ASIMO",
+	        "height": 130,
+	"lethal": false}
+
+Add delete()
+@ResponseStatus(HttpStatus.NO_CONTENT)
+@RequestMapping(path = "/{id}", method = RequestMethod.DELETE)
+public void delete(@PathVariable String id) {
+    robotRepository.delete(id);
+}
+
+Go to POSTMAN
+Proof it works!
+
+Extend findAll with (lethal)
+@RequestMapping
+public List<Robot> findAll(@RequestParam(required = false) Boolean lethal) {
+    if (lethal == null) {
+        return robotRepository.findAll();
+    } else {
+        return robotRepository.findByLethal(lethal);
+    }
+}
+
+Go to POSTMAN
+Proof it works!
+
